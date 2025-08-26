@@ -17,12 +17,12 @@ echo 1.  查看设备
 echo 2.  安装APK
 echo 3.  无线连接
 echo 4.  Scrcpy 高级投屏
-echo 5.  卸载应用
-echo 6.  重启设备
-echo 7.  重启到Recovery
-echo 8.  重启到Bootloader
-echo 9.  截屏
-echo 10. 录屏
+echo 5.  截屏
+echo 6.  录屏
+echo 7.  卸载应用
+echo 8.  重启设备
+echo 9.  重启到Recovery
+echo 10. 重启到Bootloader
 echo 11. 查看日志
 echo 12. 清除日志
 echo 13. 获取序列号
@@ -43,12 +43,12 @@ if "%choice%"=="1" goto devices
 if "%choice%"=="2" goto install_apk
 if "%choice%"=="3" goto wireless_connect
 if "%choice%"=="4" goto scrcpy_menu
-if "%choice%"=="5" goto uninstall_app
-if "%choice%"=="6" goto reboot
-if "%choice%"=="7" goto reboot_recovery
-if "%choice%"=="8" goto reboot_bootloader
-if "%choice%"=="9" goto screenshot
-if "%choice%"=="10" goto screen_record
+if "%choice%"=="5" goto screenshot
+if "%choice%"=="6" goto screen_record
+if "%choice%"=="7" goto uninstall_app
+if "%choice%"=="8" goto reboot
+if "%choice%"=="9" goto reboot_recovery
+if "%choice%"=="10" goto reboot_bootloader
 if "%choice%"=="11" goto view_logs
 if "%choice%"=="12" goto clear_logs
 if "%choice%"=="13" goto get_serial
@@ -120,68 +120,7 @@ echo.
 pause
 goto menu
 
-:screenshot
-cls
-echo 截屏功能
-echo.
-set /p filename=请输入截图文件名 (默认: screenshot.png):
-if "%filename%"=="" set filename=screenshot.png
-echo 正在截屏...
-adb shell screencap /sdcard/screenshot.png
-adb pull /sdcard/screenshot.png "%filename%"
-adb shell rm /sdcard/screenshot.png
-echo 截图已保存为: %filename%
-echo.
-pause
-goto menu
 
-:screen_record
-cls
-echo 录屏功能
-echo.
-echo 1. 开始录制
-echo 2. 停止
-echo.
-set /p record_choice=请选择操作 (1-2):
-if "%record_choice%"=="1" goto start_record
-if "%record_choice%"=="2" goto stop_record
-goto screen_record
-
-:start_record
-set /p record_filename=请输入录制文件名 (默认: screen_record.mp4):
-if "%record_filename%"=="" set record_filename=screen_record.mp4
-
-echo 正在检查设备是否支持录屏...
-for /f "tokens=*" %%a in ('adb shell "command -v screenrecord"') do (
-    set "screenrecord_path=%%a"
-)
-
-if not defined screenrecord_path (
-    echo.
-    echo 错误: 您的设备不支持录屏功能 (找不到 screenrecord 命令).
-    echo 这通常发生在 Android 4.4 之前的版本.
-    echo.
-    pause
-    goto screen_record
-)
-
-echo 正在开始录制...
-adb shell screenrecord /sdcard/screen_record.mp4 &
-echo 录制已开始，按任意键停止...
-pause
-goto stop_record
-
-:stop_record
-echo 正在停止录制...
-adb shell pkill -l SIGINT screenrecord
-timeout /t 3 /nobreak >nul
-echo 正在下载录制文件...
-adb pull /sdcard/screen_record.mp4 "%record_filename%"
-adb shell rm /sdcard/screen_record.mp4
-echo 录制文件已保存为: %record_filename%
-echo.
-pause
-goto menu
 
 :view_logs
 cls
@@ -426,14 +365,33 @@ goto scrcpy_submenu
 :scrcpy_record
 cls
 echo 正在启动 Scrcpy 录屏模式...
-echo 视频将保存为 scrcpy_record.mkv，保存在当前目录下。
+echo.
+
+REM 检查 scrcpy_record 文件夹是否存在，如果不存在则创建
+if not exist "scrcpy_record" (
+    echo 创建 scrcpy_record 文件夹...
+    mkdir "scrcpy_record"
+    echo 文件夹创建成功。
+    echo.
+)
+
+REM 生成当前时间戳作为文件名
+for /f "tokens=1-6 delims=/:. " %%a in ("%date% %time%") do (
+    set "timestamp=%%a%%b%%c_%%d%%e%%f"
+)
+REM 移除时间戳中的空格
+set "timestamp=%timestamp: =%"
+
+set "record_filename=scrcpy_record\scrcpy_record_%timestamp%.mkv"
+echo 视频将保存为: %record_filename%
 echo.
 echo 请注意: 录屏期间 scrcpy 窗口可能不会显示。
 echo 关闭这个窗口来停止录制.
 echo.
-scrcpy --record=scrcpy_record.mkv
+scrcpy --record="%record_filename%"
 echo.
 echo 录制已停止。
+echo 视频已保存到: %record_filename%
 pause
 goto scrcpy_submenu
 
@@ -525,6 +483,119 @@ echo.
 scrcpy --display-id=%1 %~2
 goto :eof
 
+:screenshot
+cls
+echo 截屏功能
+echo.
+echo 检查设备连接状态...
+adb devices | find "device" >nul
+if errorlevel 1 (
+    echo 错误: 未检测到已连接的设备，请检查设备连接和USB调试设置
+    echo.
+    pause
+    goto menu
+)
+
+REM 检查并创建screenshot文件夹
+if not exist "screenshot" (
+    echo 创建screenshot文件夹...
+    mkdir screenshot
+)
+
+set /p filename=请输入截图文件名 (默认: screenshot.png):
+if "%filename%"=="" set filename=screenshot.png
+
+REM 确保文件名有.png扩展名
+echo %filename% | find ".png" >nul
+if errorlevel 1 set filename=%filename%.png
+
+echo 正在截屏...
+adb shell screencap /sdcard/screenshot.png
+if errorlevel 1 (
+    echo 错误: 截屏失败，请检查设备权限
+    echo.
+    pause
+    goto menu
+)
+
+echo 正在下载截图文件...
+adb pull /sdcard/screenshot.png "screenshot\%filename%"
+if errorlevel 1 (
+    echo 错误: 下载截图失败
+    echo.
+    pause
+    goto menu
+)
+
+adb shell rm /sdcard/screenshot.png
+echo 截图已成功保存为: screenshot\%filename%
+echo.
+pause
+goto menu
+
+:screen_record
+cls
+echo 录屏功能
+echo.
+echo 检查设备连接状态...
+adb devices | find "device" >nul
+if errorlevel 1 (
+    echo 错误: 未检测到已连接的设备，请检查设备连接和USB调试设置
+    echo.
+    pause
+    goto menu
+)
+
+echo 1. 开始录制
+echo 2. 停止录制
+echo.
+set /p record_choice=请选择操作 (1-2):
+if "%record_choice%"=="1" goto start_record
+if "%record_choice%"=="2" goto stop_record
+goto screen_record
+
+:start_record
+REM 检查并创建scrcpy_record文件夹
+if not exist "scrcpy_record" (
+    echo 创建scrcpy_record文件夹...
+    mkdir scrcpy_record
+)
+
+set /p record_filename=请输入录制文件名 (默认: screen_record.mp4):
+if "%record_filename%"=="" set record_filename=screen_record.mp4
+
+REM 确保文件名有.mp4扩展名
+echo %record_filename% | find ".mp4" >nul
+if errorlevel 1 set record_filename=%record_filename%.mp4
+
+echo 正在使用Scrcpy开始录制...
+echo 录制将保存到: scrcpy_record\%record_filename%
+echo.
+echo 提示: 录制窗口会显示设备屏幕，按 Ctrl+C 停止录制
+echo 或者关闭录制窗口来停止录制
+echo.
+
+REM 使用scrcpy进行录屏
+scrcpy-win64-v3.3.1\scrcpy.exe --record "scrcpy_record\%record_filename%" --no-audio
+if errorlevel 1 (
+    echo 错误: 录屏启动失败，请检查设备连接和scrcpy配置
+    echo.
+    pause
+    goto screen_record
+)
+
+echo 录制已完成
+echo 录制文件已保存为: scrcpy_record\%record_filename%
+echo.
+pause
+goto screen_record
+
+:stop_record
+echo 注意: 使用Scrcpy录屏时，请直接关闭录制窗口或按 Ctrl+C 停止录制
+echo 无需使用此选项停止录制
+echo.
+pause
+goto screen_record
 
 echo.
 pause

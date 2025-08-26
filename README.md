@@ -42,6 +42,14 @@
 
 ---
 
+## 视频教程
+
+📺 **详细使用教程**: [B站视频教程](https://www.bilibili.com/video/BV1YivKz1Eaj/?share_source=copy_web&vd_source=80d27e156558a950280846f6a49e5e75)
+
+观看视频教程可以更直观地了解工具的使用方法和各项功能。
+
+---
+
 ## 功能详解
 
 ### 主菜单
